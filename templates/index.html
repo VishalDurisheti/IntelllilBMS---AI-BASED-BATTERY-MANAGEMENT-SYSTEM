@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IntelliBMS - AI-Powered EV Battery Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Dark theme variables (default) */
+            --bg-primary: #0a101f;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #e2e8f0;
+            --text-secondary: #cbd5e1;
+            --text-tertiary: #94a3b8;
+            --text-muted: #64748b;
+            --border-primary: #334155;
+            --border-secondary: #475569;
+            --cell-normal-bg: #334155;
+            --cell-normal-border: #475569;
+            --chart-grid: rgba(255, 255, 255, 0.1);
+        }
+        
+        [data-theme="light"] {
+            /* Light theme variables */
+            --bg-primary: #f8fafc;
+            --bg-secondary: #ffffff;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #334155;
+            --text-tertiary: #475569;
+            --text-muted: #64748b;
+            --border-primary: #e2e8f0;
+            --border-secondary: #cbd5e1;
+            --cell-normal-bg: #f1f5f9;
+            --cell-normal-border: #cbd5e1;
+            --chart-grid: rgba(0, 0, 0, 0.1);
+        }
+        
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg-primary); 
+            color: var(--text-primary);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        
+        .metric-card { 
+            transition: all 0.3s ease-in-out; 
+            background-color: var(--bg-secondary); 
+            border-color: var(--border-primary); 
+        }
+        
+        .alert-banner { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.8; } }
+        
+        .cell-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 0.75rem; }
+        .cell { @apply p-2 rounded-lg border text-center text-xs; transition: all 0.2s ease-in-out; }
+        .cell-normal { background-color: var(--cell-normal-bg); border-color: var(--cell-normal-border); }
+        .cell-balancing { background-color: #1e40af; border-color: #3b82f6; animation: pulse 1.5s infinite; }
+        .cell-faulty { background-color: #ea7070; border-color: #ef4444; transform: scale(1.05); box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+        .cell-label { @apply font-bold text-sm block mb-1; color: var(--text-secondary);}
+        .cell-data { color: var(--text-tertiary); }
+        .accuracy-value { @apply text-2xl font-bold text-teal-400; }
+        
+        /* Theme toggle button styles */
+        .theme-toggle {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background-color: var(--bg-tertiary);
+            border-radius: 15px;
+            border: 2px solid var(--border-secondary);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .theme-toggle::before {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 22px;
+            height: 22px;
+            background-color: #fbbf24;
+            border-radius: 50%;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        [data-theme="light"] .theme-toggle::before {
+            transform: translateX(28px);
+            background-color: #3b82f6;
+        }
+        
+        .theme-toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .theme-icon {
+            font-size: 1.2rem;
+            transition: opacity 0.3s ease;
+        }
+        
+        [data-theme="dark"] .sun-icon {
+            opacity: 0.5;
+        }
+        
+        [data-theme="light"] .moon-icon {
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="container mx-auto">
+        <header class="text-center mb-8 relative">
+            <div class="absolute top-0 right-0 theme-toggle-container">
+                <span class="theme-icon moon-icon">🌙</span>
+                <div class="theme-toggle" id="theme-toggle" title="Toggle dark/light mode"></div>
+                <span class="theme-icon sun-icon">☀️</span>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-bold text-cyan-400">IntelliBMS Dashboard</h1>
+            <p class="mt-2" style="color: var(--text-muted)">Enhanced AI Forecasting & Cell-Level Monitoring</p>
+        </header>
+        <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+            <!-- Metrics -->
+            <!-- THIS IS THE NEW, CORRECTED CODE -->
+<div class="lg:col-span-1 metric-card p-6 rounded-2xl shadow-lg border border-cyan-500 flex flex-col justify-center">
+    <h2 class="text-lg font-semibold mb-2 text-center" style="color: var(--text-secondary)">Predicted Pack SoH</h2>
+    <p id="soh-value" class="text-5xl text-center font-bold text-cyan-400">--%</p>
+</div>
+            <div class="metric-card p-6 rounded-2xl shadow-lg flex flex-col justify-center">
+                <h3 class="text-base font-semibold text-center" style="color: var(--text-secondary)">Total Pack Voltage</h3>
+                <p id="voltage-value" class="text-4xl font-bold mt-2 text-green-400 text-center">-- V</p>
+            </div>
+            <div class="metric-card p-6 rounded-2xl shadow-lg flex flex-col justify-center">
+                <h3 class="text-base font-semibold text-center" style="color: var(--text-secondary)">Avg. Temperature</h3>
+                <p id="temperature-value" class="text-4xl font-bold mt-2 text-orange-400 text-center">-- °C</p>
+            </div>
+             <div class="lg:col-span-2 metric-card p-6 rounded-2xl shadow-lg border border-purple-500 flex flex-col justify-center">
+                <h2 class="text-lg font-semibold mb-2 text-center" style="color: var(--text-secondary)">Long-Term Forecast</h2>
+                <p class="text-center text-sm" style="color: var(--text-muted)">Projected month to reach 80% SoH:</p>
+                <p id="forecast-value" class="text-4xl text-center font-bold text-purple-400 mt-1">--</p>
+            </div>
+
+            <!-- NEW: Model Performance Card -->
+            <div class="lg:col-span-1 metric-card p-6 rounded-2xl shadow-lg border border-teal-500 flex flex-col justify-around">
+                <h2 class="text-lg font-semibold text-center" style="color: var(--text-secondary)">Model Performance</h2>
+                <div class="text-center">
+                    <p class="text-sm" style="color: var(--text-muted)">Mean Absolute Error</p>
+                    <p id="mae-value" class="accuracy-value">-- %</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm" style="color: var(--text-muted)">R² Score (Accuracy)</p>
+                    <p id="r2-value" class="accuracy-value">--</p>
+                </div>
+            </div>
+
+            <div id="alert-card" class="lg:col-span-6 metric-card p-4 rounded-2xl shadow-lg">
+                 <h3 class="text-lg font-semibold text-center" style="color: var(--text-secondary)">System Alerts</h3>
+                 <div id="alert-message" class="mt-1 text-lg h-full flex items-center justify-center" style="color: var(--text-muted)">Initializing...</div>
+            </div>
+            
+            <!-- Remediation Guidance Card -->
+            <div id="remediation-card" class="lg:col-span-6 metric-card p-4 rounded-2xl shadow-lg border border-amber-500">
+                <h3 class="text-lg font-semibold text-center" style="color: var(--text-secondary)">Recommended Actions</h3>
+                <div id="remediation-message" class="mt-1 text-base h-full flex items-center justify-center text-center px-4" style="color: var(--text-muted)">Assessing system status...</div>
+            </div>
+            
+            <div class="lg:col-span-3 metric-card p-6 rounded-2xl shadow-lg">
+                <h2 class="text-xl font-semibold mb-4" style="color: var(--text-secondary)">SoH Degradation & Forecast</h2>
+                <canvas id="soh-history-chart"></canvas>
+            </div>
+
+            <div class="lg:col-span-3 metric-card p-6 rounded-2xl shadow-lg">
+                <h2 class="text-xl font-semibold mb-4" style="color: var(--text-secondary)">Live Cell Monitoring</h2>
+                <div id="cell-grid-container" class="cell-grid mt-4"></div>
+            </div>
+        </main>
+    </div>
+    <script>
+        // --- THEME MANAGEMENT ---
+        const themeToggle = document.getElementById('theme-toggle');
+        const body = document.body;
+        
+        // Load saved theme or default to dark
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        body.setAttribute('data-theme', savedTheme);
+        
+        // Theme toggle functionality
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            // Update chart colors if chart exists
+            if (sohHistoryChart) {
+                updateChartTheme();
+            }
+        });
+        
+        function updateChartTheme() {
+            const currentTheme = body.getAttribute('data-theme');
+            const gridColor = currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            const textColor = currentTheme === 'dark' ? '#94a3b8' : '#475569';
+            
+            sohHistoryChart.options.scales.x.grid.color = gridColor;
+            sohHistoryChart.options.scales.x.ticks.color = textColor;
+            sohHistoryChart.options.scales.y.grid.color = gridColor;
+            sohHistoryChart.options.scales.y.ticks.color = textColor;
+            sohHistoryChart.options.scales.y.title.color = textColor;
+            sohHistoryChart.options.plugins.legend.labels.color = currentTheme === 'dark' ? '#e2e8f0' : '#1e293b';
+            
+            sohHistoryChart.update('none');
+        }
+        
+        // --- FINAL, ROBUST CONFIGURATION ---
+        const API_URL = '/api/live-data';
+        // --- Get All Elements --- (IDs have been added for the new card)
+        const sohValueEl = document.getElementById('soh-value'),
+              voltageValueEl = document.getElementById('voltage-value'),
+              temperatureValueEl = document.getElementById('temperature-value'),
+              alertMessageEl = document.getElementById('alert-message'),
+              alertCard = document.getElementById('alert-card'),
+              cellGridContainer = document.getElementById('cell-grid-container'),
+              forecastValueEl = document.getElementById('forecast-value'),
+              maeValueEl = document.getElementById('mae-value'),
+              r2ValueEl = document.getElementById('r2-value');
+        let sohHistoryChart;
+
+        function updateCellGrid(cells) {
+            cellGridContainer.innerHTML = '';
+            cells.forEach(cell => {
+                const cellDiv = document.createElement('div');
+                let cellStateClass = cell.is_faulty ? 'cell-faulty' : (cell.is_balancing ? 'cell-balancing' : 'cell-normal');
+                cellDiv.className = `cell ${cellStateClass}`;
+                cellDiv.innerHTML = `<span class="cell-label">Cell ${cell.id}</span><div class="cell-data"><span>${cell.voltage.toFixed(3)}V</span></div>`;
+                cellGridContainer.appendChild(cellDiv);
+            });
+        }
+        
+        async function updateDashboard() {
+            try {
+                const response = await fetch(`${API_URL}?t=${new Date().getTime()}`);
+                if (!response.ok) throw new Error(`Server responded with status: ${response.status}`);
+                const data = await response.json();
+                const { pack_summary, cells, long_term_forecast, model_performance } = data;
+
+                sohValueEl.textContent = `${pack_summary.state_of_health}%`;
+                voltageValueEl.textContent = `${pack_summary.total_voltage} V`;
+                temperatureValueEl.textContent = `${pack_summary.avg_temperature} °C`;
+                forecastValueEl.textContent = long_term_forecast.text;
+                
+                // Update the new accuracy card
+                if (model_performance) {
+                    maeValueEl.textContent = `${model_performance.mae}%`;
+                    r2ValueEl.textContent = model_performance.r2_score;
+                }
+
+                // (Alerts and chart logic remain the same)
+                if (pack_summary.alert !== "None") {
+                    alertMessageEl.textContent = pack_summary.alert;
+                    alertCard.classList.add('border-red-500', 'alert-banner');
+                } else {
+                    alertMessageEl.textContent = "Monitoring... All systems normal.";
+                    alertCard.classList.remove('border-red-500', 'alert-banner');
+                }
+                // Update remediation guidance
+                const remediationEl = document.getElementById('remediation-message');
+                remediationEl.textContent = getRemediationAdvice(pack_summary, cells);
+                updateCellGrid(cells);
+                if (long_term_forecast && sohHistoryChart.data.datasets.length === 0) {
+                    sohHistoryChart.data.datasets.push(
+                        { label: 'Historical SoH', data: long_term_forecast.history.map(d => ({ x: d.timestamp * 1000, y: d.soh })), borderColor: '#06b6d4', borderWidth: 2, pointRadius: 0 },
+                        { label: 'Projected Degradation', data: long_term_forecast.projection.map(d => ({ x: d.x * 1000, y: d.y })), borderColor: '#a855f7', borderWidth: 2, borderDash: [5, 5], pointRadius: 2, fill: false }
+                    );
+                    sohHistoryChart.update();
+                }
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                alertMessageEl.textContent = `Connection Error. Ensure server is running.`;
+            }
+        }
+
+        // Generate actionable remediation guidance
+        function getRemediationAdvice(pack, cells = []) {
+            const soh = Number(pack.state_of_health || 100);
+            const temp = Number(pack.avg_temperature || 25);
+            const alert = (pack.alert || 'None').toLowerCase();
+
+            // Cell-level analysis
+            const voltages = (cells || []).map(c => Number(c.voltage || 0));
+            const faultyCells = (cells || []).filter(c => c.is_faulty);
+            const balancingCells = (cells || []).filter(c => c.is_balancing);
+            const vMin = voltages.length ? Math.min(...voltages) : undefined;
+            const vMax = voltages.length ? Math.max(...voltages) : undefined;
+            const spread = (vMax !== undefined && vMin !== undefined) ? (vMax - vMin) : 0;
+
+            // Tunable thresholds
+            const OVERHEAT_CRITICAL = 60; // °C
+            const OVERHEAT_HIGH = 50; // °C
+            const IMBALANCE_SEVERE = 0.10; // V
+            const IMBALANCE_MODERATE = 0.05; // V
+            const LOW_CELL_VOLT = 3.40; // V
+
+            // Highest priority: explicit critical fault alerts
+            if (alert.includes('critical')) {
+                return 'Critical fault detected: Park safely, avoid high-speed driving and rapid acceleration, and contact service immediately. Do not fast charge until inspected.';
+            }
+
+            // Faulty cells guidance
+            if (faultyCells.length > 0) {
+                const ids = faultyCells.map(c => `#${c.id}`).join(', ');
+                return `Cell fault detected (${ids}): Minimize driving, avoid deep discharge and fast charging, keep SOC between 20–80%, and schedule service as soon as possible.`;
+            }
+
+            // Temperature-based guidance
+            if (temp >= OVERHEAT_CRITICAL) {
+                return 'Battery overheating: Reduce load immediately, park in a cool/shaded area, allow cooling, and contact service if temperature does not drop quickly. Avoid fast charging.';
+            } else if (temp >= OVERHEAT_HIGH) {
+                return 'High temperature detected: Avoid high-speed driving and fast charging. Allow the vehicle to cool and monitor temperature closely.';
+            }
+
+            // Voltage imbalance guidance
+            if (spread >= IMBALANCE_SEVERE) {
+                return `Severe cell imbalance detected (ΔV ≈ ${(spread).toFixed(3)} V): Drive gently, avoid fast charging, and schedule service for pack balancing/diagnostics.`;
+            } else if (spread >= IMBALANCE_MODERATE) {
+                if (balancingCells.length > 0) {
+                    return `Moderate imbalance detected (ΔV ≈ ${(spread).toFixed(3)} V): Pack balancing in progress. Keep vehicle idle and plugged (if possible) to allow BMS to balance. Avoid fast charging.`;
+                }
+                return `Moderate imbalance detected (ΔV ≈ ${(spread).toFixed(3)} V): Drive conservatively and allow the vehicle to rest after charging to enable passive balancing.`;
+            }
+
+            // Low individual cell voltage
+            if (vMin !== undefined && vMin < LOW_CELL_VOLT) {
+                return `Low cell voltage detected (${vMin.toFixed(3)} V): Avoid high load and deep discharge; charge to a moderate level (≈60–80%) and monitor.`;
+            }
+
+            // SoH-based guidance
+            if (soh <= 75) {
+                return 'Low State of Health: Plan a service inspection. Expect reduced range and performance; avoid demanding driving conditions.';
+            } else if (soh <= 85) {
+                return 'Moderate degradation: Drive conservatively to extend battery life and schedule a diagnostic check at your convenience.';
+            }
+
+            // Default guidance
+            if (alert !== 'none') {
+                return 'Check vehicle status: Drive cautiously and monitor alerts. If warnings persist, contact service.';
+            }
+            return 'All systems normal: No immediate action required. Continue normal operation and periodic monitoring.';
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const ctx = document.getElementById('soh-history-chart').getContext('2d');
+            const currentTheme = body.getAttribute('data-theme');
+            const gridColor = currentTheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+            const textColor = currentTheme === 'dark' ? '#94a3b8' : '#475569';
+            const legendColor = currentTheme === 'dark' ? '#e2e8f0' : '#1e293b';
+            
+            sohHistoryChart = new Chart(ctx, {
+                type: 'line', data: { datasets: [] }, options: { 
+                    scales: {
+                        x: { type: 'time', time: { unit: 'month' }, grid: { color: gridColor }, ticks: { color: textColor } },
+                        y: { title: { display: true, text: 'State of Health (%)', color: textColor }, grid: { color: gridColor }, ticks: { color: textColor } }
+                    },
+                    plugins: { legend: { labels: { color: legendColor } } }
+                }
+            });
+            updateDashboard();
+            setInterval(updateDashboard, 3000);
+        });
+    </script>
+</body>
+</html>
